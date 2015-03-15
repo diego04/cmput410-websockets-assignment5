@@ -14,17 +14,25 @@
 # limitations under the License.
 #
 import flask
-from flask import Flask, request
+from flask import Flask, request, Blueprint
 from flask_sockets import Sockets
 import gevent
 from gevent import queue
 import time
 import json
 import os
+from flask import render_template
+
 
 app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
+
+profile = Blueprint('profile', __name__,
+                    template_folder='static',
+                    static_folder='static')
+app.register_blueprint(profile, url_prefix='')
+
 
 class World:
     def __init__(self):
@@ -59,7 +67,19 @@ class World:
     def world(self):
         return self.space
 
-myWorld = World()        
+
+class Client:
+    def __init__(self):
+        self.queue = queue.Queue()
+
+    def put(self, v):
+        self.queue.put(v, False)
+
+    def get(self):
+        return self.queue.get()
+
+myWorld = World()
+clients = list()
 
 def set_listener( entity, data ):
     ''' do something with the update ! '''
@@ -69,18 +89,61 @@ myWorld.add_set_listener( set_listener )
 @app.route('/')
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return render_template('index.html')
+    #return None
 
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
-    return None
+    #Greenlet is a light-weight cooperatively-scheduled execution unit.
+    #just moves stacks back and fourth from heap to avoid stackoverflow
+    #python uses heap, c uses stack
+
+    #greenlet has their own address in the stack
+    #the python code of newly spawned stack uses the heap
+
+    try:
+        while True:
+            msg = ws.receive()
+
+            if msg is not None:
+                packet = json.loads(msg)
+            else:
+                break
+
+
+            '''
+            print "WS RECV: %s" % msg
+            if (msg is not None):
+                packet = json.loads(msg)
+                send_all_json( packet )
+            else:
+                break'''
+    except:
+        '''Done'''
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
-    # XXX: TODO IMPLEMENT ME
+
+    client = Client()
+    clients.append(client)
+
+    #spawn
+    #Create a new Greenlet object and schedule it to run function(*args, **kwargs). This is an alias for Greenlet.spawn().
+    Gevent = gevent.spawn(read_ws,ws,client)
+    try:
+        while True:
+            msg=client.get()
+            ws.send(msg)
+    except:
+        print "error"
+    finally:
+        clients.remove(client)
+        gevent.kill(Gevent)
+
+
     return None
 
 
@@ -97,22 +160,25 @@ def flask_post_json():
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+
+    myWorld.set(entity,flask_post_json())
+    return json.dumps(myWorld.set(entity))
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    #space is just a dictionary with value of an entity
+    #an entity is just another key value
+    return json.dumps(myWorld.world())
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
-    '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    return json.dumps(myWorld.get(entity))
 
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
-    '''Clear the world out!'''
+    myWorld.clear()
     return None
 
 
