@@ -23,7 +23,6 @@ import json
 import os
 from flask import render_template
 
-
 app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
@@ -41,17 +40,17 @@ class World:
         self.listeners = list()
         
     def add_set_listener(self, listener):
-        self.listeners.append( listener )
+        self.listeners.append(listener)
 
     def update(self, entity, key, value):
         entry = self.space.get(entity,dict())
         entry[key] = value
         self.space[entity] = entry
-        self.update_listeners( entity )
+        self.update_listeners(entity)
 
     def set(self, entity, data):
         self.space[entity] = data
-        self.update_listeners( entity )
+        self.update_listeners(entity)
 
     def update_listeners(self, entity):
         '''update the set listeners'''
@@ -62,7 +61,7 @@ class World:
         self.space = dict()
 
     def get(self, entity):
-        return self.space.get(entity,dict())
+        return self.space.get(entity, dict())
     
     def world(self):
         return self.space
@@ -81,18 +80,46 @@ class Client:
 myWorld = World()
 clients = list()
 
-def set_listener( entity, data ):
-    ''' do something with the update ! '''
 
-myWorld.add_set_listener( set_listener )
-        
+def send_all(msg):
+    for client in clients:
+        client.put(msg)
+
+
+def send_all_json(obj):
+    send_all(json.dumps(obj))
+
+
+def set_listener(entity, data):
+
+    ''' do something with the update !
+    #this is where things get updated
+
+    #what do we do with entity and data that we recieve?
+    #we put them in a dictionary
+    #we turn them into json
+    #then we pass this around sowe can append it
+
+    #start with
+
+    #ok our world class has a list, a list of listneres
+    #this thing below says we should add a listener in our list of listeners
+    #this listener can be updated; listener is dictionary that contains key-value of the drawing
+    #postponed call? motherf**** '''
+
+    an_entity = dict()
+    an_entity[entity] = data
+    send_all_json(an_entity)
+
+myWorld.add_set_listener(set_listener)
+
 @app.route('/')
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
     return render_template('index.html')
-    #return None
 
-def read_ws(ws,client):
+
+def read_ws(ws, client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
     #Greenlet is a light-weight cooperatively-scheduled execution unit.
@@ -101,24 +128,15 @@ def read_ws(ws,client):
 
     #greenlet has their own address in the stack
     #the python code of newly spawned stack uses the heap
-
     try:
         while True:
             msg = ws.receive()
 
             if msg is not None:
                 packet = json.loads(msg)
+                send_all_json(packet)
             else:
                 break
-
-
-            '''
-            print "WS RECV: %s" % msg
-            if (msg is not None):
-                packet = json.loads(msg)
-                send_all_json( packet )
-            else:
-                break'''
     except:
         '''Done'''
 
@@ -135,14 +153,15 @@ def subscribe_socket(ws):
     Gevent = gevent.spawn(read_ws,ws,client)
     try:
         while True:
+            #send something to the client
             msg=client.get()
             ws.send(msg)
     except:
         print "error"
+
     finally:
         clients.remove(client)
         gevent.kill(Gevent)
-
 
     return None
 
@@ -160,8 +179,7 @@ def flask_post_json():
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-
-    myWorld.set(entity,flask_post_json())
+    myWorld.set(entity, flask_post_json())
     return json.dumps(myWorld.set(entity))
 
 @app.route("/world", methods=['POST','GET'])    
@@ -175,12 +193,10 @@ def world():
 def get_entity(entity):
     return json.dumps(myWorld.get(entity))
 
-
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     myWorld.clear()
     return None
-
 
 
 if __name__ == "__main__":
