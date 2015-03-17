@@ -45,7 +45,6 @@ debug("Test");
 
 world = {};
 
-//XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
     with(context) {
         beginPath();
@@ -54,8 +53,10 @@ function drawCircle(context,entity) {
         var y = entity["y"];
         //moveTo(x,y);
         fillStyle = entity["colour"];
-        strokeStyle = fillStyle;
+        strokeStyle = 'white';
         arc(x, y, (entity["radius"])?entity["radius"]:50, 0, 2.0 * Math.PI, false);
+        context.rect(x-3, y-3, 15, 15);
+        fill();
         stroke();
     }
 }
@@ -123,9 +124,19 @@ function getPosition(e) {
 }
 
 function addEntity(entity, data) {
+	//entity is the name
+	//data is the dictionary with key x,y,color and has values
     world[entity] = data;
     drawNextFrame(); // (but should we?)
+    //alert(JSON.stringify(world[entity]));
+    var sendjson = {};
+    sendjson[entity] = data;
+    //socket.send(JSON.stringify(world[entity]));
+    socket.send(JSON.stringify(sendjson));
     //XXX: Send a XHTML Request that updates the entity you just modified!
+    //JSON.stringify(world[entity]);
+
+    
 }
 var counter = 0;
 function addEntityWithoutName(data) {
@@ -246,6 +257,7 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 
 function update() {
+    //drawNextFrame();
     drawFrame();
 }
 
@@ -255,6 +267,8 @@ function wsSetup() {
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX: TODO What are you going to do here?
+        //JSON.stringify();
+        //read all the previous data
     };
     socket.onerror = function(msg) {
         debug("WebSocket Error:" + msg.data);
@@ -262,7 +276,20 @@ function wsSetup() {
     socket.onmessage = function(msg) {
         try {
             debug("WebSocket Recv:" + msg.data);
+            //RECIEVE STUFF FROM SERVER
             //XXX: TODO What are you going to do here?
+            //read more data
+            //alert(msg.data)
+            xworld = JSON.parse(msg.data);
+            
+        	for (var key in xworld) {
+       			var xentity = xworld[key];
+       			world[key] = xentity;	
+       			// drawNextFrame();
+
+        	}
+            drawNextFrame();
+
         } catch (e) {
             alert("socket on message: " + e);
         }
@@ -271,13 +298,8 @@ function wsSetup() {
 
 wsSetup();
 
-
-
-
 // 30 frames per second
 setInterval( update, 1000/30.0);
-
-
     </script>
 </body>
 </html>

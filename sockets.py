@@ -53,7 +53,6 @@ class World:
         self.update_listeners(entity)
 
     def update_listeners(self, entity):
-        '''update the set listeners'''
         for listener in self.listeners:
             listener(entity, self.get(entity))
 
@@ -91,22 +90,6 @@ def send_all_json(obj):
 
 
 def set_listener(entity, data):
-
-    ''' do something with the update !
-    #this is where things get updated
-
-    #what do we do with entity and data that we recieve?
-    #we put them in a dictionary
-    #we turn them into json
-    #then we pass this around sowe can append it
-
-    #start with
-
-    #ok our world class has a list, a list of listneres
-    #this thing below says we should add a listener in our list of listeners
-    #this listener can be updated; listener is dictionary that contains key-value of the drawing
-    #postponed call? motherf**** '''
-
     an_entity = dict()
     an_entity[entity] = data
     send_all_json(an_entity)
@@ -115,25 +98,17 @@ myWorld.add_set_listener(set_listener)
 
 @app.route('/')
 def hello():
-    '''Return something coherent here.. perhaps redirect to /static/index.html '''
     return render_template('index.html')
 
 
 def read_ws(ws, client):
-    '''A greenlet function that reads from the websocket and updates the world'''
-    # XXX: TODO IMPLEMENT ME
-    #Greenlet is a light-weight cooperatively-scheduled execution unit.
-    #just moves stacks back and fourth from heap to avoid stackoverflow
-    #python uses heap, c uses stack
-
-    #greenlet has their own address in the stack
-    #the python code of newly spawned stack uses the heap
     try:
         while True:
             msg = ws.receive()
 
             if msg is not None:
                 packet = json.loads(msg)
+                # just send a dictionary of k-v
                 send_all_json(packet)
             else:
                 break
@@ -142,18 +117,13 @@ def read_ws(ws, client):
 
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
-    '''Fufill the websocket URL of /subscribe, every update notify the
-       websocket and read updates from the websocket '''
 
     client = Client()
     clients.append(client)
+    g_event = gevent.spawn(read_ws, ws, client)
 
-    #spawn
-    #Create a new Greenlet object and schedule it to run function(*args, **kwargs). This is an alias for Greenlet.spawn().
-    Gevent = gevent.spawn(read_ws,ws,client)
     try:
         while True:
-            #send something to the client
             msg=client.get()
             ws.send(msg)
     except:
@@ -161,14 +131,12 @@ def subscribe_socket(ws):
 
     finally:
         clients.remove(client)
-        gevent.kill(Gevent)
+        gevent.kill(g_event)
 
     return None
 
 
 def flask_post_json():
-    '''Ah the joys of frameworks! They do so much work for you
-       that they get in the way of sane operation!'''
     if (request.json != None):
         return request.json
     elif (request.data != None and request.data != ''):
@@ -178,15 +146,11 @@ def flask_post_json():
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
-    '''update the entities via this interface'''
     myWorld.set(entity, flask_post_json())
     return json.dumps(myWorld.set(entity))
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
-    '''you should probably return the world here'''
-    #space is just a dictionary with value of an entity
-    #an entity is just another key value
     return json.dumps(myWorld.world())
 
 @app.route("/entity/<entity>")    

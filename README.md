@@ -14,6 +14,12 @@ pip install flask-sockets
 
 pip install ws4py
 
+Resources:
+https://github.com/diego04/410Assign4AJAX
+
+In class:
+https://github.com/diego04/WebSocketsExamples
+
 Contributors / Licensing
 ========================
 
